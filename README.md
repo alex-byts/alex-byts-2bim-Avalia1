@@ -24,4 +24,4 @@ Framework preset: `None`. Build command: vazio. Build output directory: `public`
 
 Nome: Alexandre Salvario Sontag
 RA: 2026108703
-URL: https://
+URL: https://alex-byts-2bim-avalia1.pages.dev
