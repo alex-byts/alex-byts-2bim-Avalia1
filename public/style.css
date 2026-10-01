@@ -127,3 +127,29 @@ figure svg {
     grid-row: auto;
   }
 }
+
+[hidden] {
+  display: none !important;
+}
+
+form {
+  grid-template-columns: 1fr auto;
+}
+
+form button {
+  grid-row: 2;
+}
+
+#login {
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+}
+
+#usuario {
+  margin: 0 0 12px;
+  color: var(--texto-suave);
+}

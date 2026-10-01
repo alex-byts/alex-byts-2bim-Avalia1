@@ -1,36 +1,114 @@
 // script.js
-// Versao inicial: todo o trabalho acontece no navegador.
-// A tarefa consiste em levar gerarDesenho para o servidor (Pages Functions)
-// e fazer esta pagina apenas enviar o numero e exibir a resposta.
+// O navegador so envia o numero e o token do Google para /api/desenho
+// e exibe o SVG devolvido pelo servidor.
 
-import { gerarDesenho, numeroValido } from "./desenho.js";
+const CLIENT_ID = "874671716411-v6il7apv21knmb09ftpqtbsfskvk3m0h.apps.googleusercontent.com";
 
+const secaoLogin = document.getElementById("login");
+const textoUsuario = document.getElementById("usuario");
 const formulario = document.getElementById("formulario");
 const campoNumero = document.getElementById("numero");
-const campoEmail = document.getElementById("email");
 const area = document.getElementById("desenho");
 const mensagem = document.getElementById("mensagem");
 const botaoBaixar = document.getElementById("baixar");
 
+let idToken = "";
 let svgAtual = "";
 
-formulario.addEventListener("submit", (evento) => {
+function emailDoToken(token) {
+  try {
+    const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const json = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + c.charCodeAt(0).toString(16).padStart(2, "0"))
+        .join("")
+    );
+    return JSON.parse(json).email || "";
+  } catch {
+    return "";
+  }
+}
+
+function mostrarLogado() {
+  const email = emailDoToken(idToken);
+  textoUsuario.textContent = email ? `Conectado como ${email}` : "Conectado com o Google";
+  textoUsuario.hidden = false;
+  secaoLogin.hidden = true;
+  formulario.hidden = false;
+}
+
+function mostrarDeslogado() {
+  idToken = "";
+  textoUsuario.hidden = true;
+  formulario.hidden = true;
+  secaoLogin.hidden = false;
+}
+
+function aoReceberCredencial(resposta) {
+  idToken = resposta.credential;
+  mensagem.textContent = "";
+  mostrarLogado();
+}
+
+function iniciarGoogle() {
+  if (!window.google || !google.accounts || !google.accounts.id) {
+    setTimeout(iniciarGoogle, 200);
+    return;
+  }
+  google.accounts.id.initialize({
+    client_id: CLIENT_ID,
+    callback: aoReceberCredencial,
+  });
+  google.accounts.id.renderButton(document.getElementById("botao-google"), {
+    theme: "filled_black",
+    size: "large",
+    text: "signin_with",
+  });
+}
+
+if (document.readyState === "complete") {
+  iniciarGoogle();
+} else {
+  window.addEventListener("load", iniciarGoogle);
+}
+
+formulario.addEventListener("submit", async (evento) => {
   evento.preventDefault();
   mensagem.textContent = "";
 
   const numero = Number(campoNumero.value);
-  const email = campoEmail.value.trim();
 
-  if (!numeroValido(numero)) {
-    mensagem.textContent = "Digite um inteiro entre 1 e 100.";
+  let resposta;
+  try {
+    resposta = await fetch("/api/desenho", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({ numero }),
+    });
+  } catch {
+    mensagem.textContent = "Não foi possível falar com o servidor. Tente novamente.";
     return;
   }
-  if (email === "") {
-    mensagem.textContent = "Informe um e-mail.";
+
+  if (resposta.status === 400) {
+    mensagem.textContent = "Erro 400: digite um número inteiro entre 1 e 100.";
+    return;
+  }
+  if (resposta.status === 401) {
+    mensagem.textContent = "Erro 401: sessão inválida ou expirada. Entre com o Google novamente.";
+    mostrarDeslogado();
+    return;
+  }
+  if (!resposta.ok) {
+    mensagem.textContent = `Erro ${resposta.status}: não foi possível gerar o desenho.`;
     return;
   }
 
-  svgAtual = gerarDesenho(numero, email);
+  svgAtual = await resposta.text();
   area.innerHTML = svgAtual;
   botaoBaixar.hidden = false;
 });
